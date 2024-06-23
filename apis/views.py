@@ -3,7 +3,7 @@ from django.http import JsonResponse
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.views.decorators.csrf import csrf_exempt
-from .models import Student
+from .models import Student, Teacher
 import json
 
 # Create your views here.
@@ -28,20 +28,45 @@ def register_student(request):
        return JsonResponse({'status': 'error', 'message': 'Only POST requests are allowed'})
     
 @csrf_exempt    
-def get_stud_details(request):
-    if request.method == 'GET':
+def get_user_details(request):
+    if request.method == 'POST':
         data = json.loads(request.body)
+        uid=data["uid"]
+        role = None
 
         try:
             student = Student.objects.get(uid=uid)
-            return student, 'Student'
+            role = student.role
+            
         except Student.DoesNotExist:
             pass
-    
 
-        student.save()
-        return  JsonResponse({'status': 'success', 'role' : f'{student.role}'})
+        try:
+            teacher = Teacher.objects.get(uid=uid)
+            role = teacher.role
+        except Teacher.DoesNotExist:
+            pass
+    
+        return  JsonResponse({'status': 'success', 'role' : f'{role}'})
     
     else:
        return JsonResponse({'status': 'error', 'message': 'Only POST requests are allowed'})
+
+@csrf_exempt
+def register_teacher(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+
+        teacher, created = Teacher.objects.get_or_create(uid=data["uid"])
+        teacher.name = data["name"]
+        teacher.division=data["division"]
+        teacher.email=data["email"]
+        teacher.role="Teacher"
+
+        teacher.save()
+
+        return JsonResponse({"status" : "Success"})
+    
+    else:
+         return JsonResponse({"status" : "Fail", "message" : "Not Allowed"})
 
