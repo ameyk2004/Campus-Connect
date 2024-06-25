@@ -3,7 +3,7 @@ from django.http import JsonResponse
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.views.decorators.csrf import csrf_exempt
-from .models import Student, Teacher, Division, Subject
+from .models import Student, Teacher, Division, Subject,Announcements
 import json
 
 # Create your views here.
@@ -96,8 +96,6 @@ def get_user_details(request):
                 'name' : f'{name}',
                 'division' : f'{division}',
                 'email' : f'{email}',
-
-
             }
             )
     
@@ -185,3 +183,29 @@ def get_users(request):
     
     else:
         return JsonResponse({"status": "error", "message": "Invalid request method"}, status=405)
+    
+@csrf_exempt
+def get_announcements(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+
+        division_name = data["division"]
+
+        division = Division.objects.get(name=division_name)
+        announcements =  division.announcements.all()
+    
+        announcements_response = []
+
+        for announcement in announcements:
+            context = {
+                "title" : announcement.title,
+                "description" : announcement.description,
+                "type" : announcement.type,
+            }
+            announcements_response.append(context)
+
+        return JsonResponse({"status" : "success", "announcements" : announcements_response})
+    
+    else:
+        return JsonResponse({"status" : "failed"})
+    

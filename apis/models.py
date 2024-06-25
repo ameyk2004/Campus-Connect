@@ -52,3 +52,13 @@ class WeekSchedule(models.Model):
 
     def __str__(self) -> str:
         return self.daySchedule.day.name
+    
+
+class Announcements(models.Model):
+    title =  models.CharField(max_length=400)
+    description = models.TextField()
+    type = models.CharField(max_length=400)
+    division = models.ManyToManyField(Division, related_name="announcements")
+
+    def __str__(self):
+        return self.title
