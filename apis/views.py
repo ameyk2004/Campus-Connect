@@ -3,7 +3,7 @@ from django.http import JsonResponse
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.views.decorators.csrf import csrf_exempt
-from .models import Student, Teacher, Division, Subject,Announcements
+from .models import Student, Teacher, Division, Subject,Announcements, TimeTable, DaySchedule,Day,TimeSlot
 import json
 
 # Create your views here.
@@ -35,6 +35,9 @@ def register_student(request):
                     'role': 'Student'
                 }
             )
+            student.save()
+            print(student.uid)
+            print(student.name)
 
             # Update Student's subjects
             subject_names = data["subjects"]
@@ -69,12 +72,16 @@ def get_user_details(request):
         uid=data["uid"]
         role = None
 
+        print(uid)
+
         try:
             student = Student.objects.get(uid=uid)
             role = student.role
             name = student.name
             division = student.division
             email = student.email
+
+            print(role)
             
         except Student.DoesNotExist:
             pass
@@ -83,8 +90,8 @@ def get_user_details(request):
             teacher = Teacher.objects.get(uid=uid)
             role = teacher.role
             name = teacher.name
-            division = student.division
-            email = student.email
+            division = teacher.division
+            email = teacher.email
 
         except Teacher.DoesNotExist:
             pass
@@ -94,7 +101,7 @@ def get_user_details(request):
                 'status': 'success', 
                 'role' : f'{role}',
                 'name' : f'{name}',
-                'division' : f'{division}',
+                'division' : f'{division.name}',
                 'email' : f'{email}',
             }
             )
@@ -209,3 +216,32 @@ def get_announcements(request):
     else:
         return JsonResponse({"status" : "failed"})
     
+@csrf_exempt
+def get_timetable(request):
+    if request.method== "POST":
+        data = json.loads(request.body)
+        year = data["year"]
+
+    
+        # timetables = TimeTable.objects.all()
+        days=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+        start_times = ["9:00","10:00","11:00", "11:15", "12:15", "13:00"]
+        time_table = {}
+
+        for day in days:
+            day = Day.objects.get(name=f"{year}-{day}")
+            day_data={}
+            for start_time in start_times:
+                time_slot= TimeSlot.objects.get(start_time=start_time)
+
+
+                daySchedule = DaySchedule.objects.get(day=day, time_slot=time_slot)
+                day_data.update({f"{daySchedule.time_slot}": f"{daySchedule.subject}" })
+
+            time_table.update({f"{day.name}": day_data})
+
+        return JsonResponse({"status" : "success",  "time_table" : time_table},)
+    
+    else:
+        return JsonResponse({"status" : "failed"})
+
