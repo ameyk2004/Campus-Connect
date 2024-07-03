@@ -87,3 +87,12 @@ class TimeTable(models.Model):
 
     def __str__(self):
         return self.year
+
+class Attendance(models.Model):
+    day_schedule = models.ForeignKey(DaySchedule, on_delete=models.CASCADE, related_name="attendances")
+    teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name="attendances")
+    students_present = models.ManyToManyField(Student, related_name="attendances")
+    date = models.DateField()
+
+    def __str__(self) -> str:
+        return f"{self.teacher.name} - {self.day_schedule.day.name} - {self.day_schedule.time_slot.start_time}"

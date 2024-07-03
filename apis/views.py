@@ -1,10 +1,11 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.views.decorators.csrf import csrf_exempt
-from .models import Student, Teacher, Division, Subject,Announcements, TimeTable, DaySchedule,Day,TimeSlot
+from .models import Student, Teacher, Division, Subject,Announcements, TimeTable, DaySchedule,Day,TimeSlot,Attendance
 import json
+from datetime import date
 
 # Create your views here.
 
@@ -145,46 +146,36 @@ def register_teacher(request):
          return JsonResponse({"status" : "Fail", "message" : "Not Allowed"})
 
 @csrf_exempt
-def get_users(request):
+def get_students(request):
     if request.method == "POST":
-        data = json.loads(request.body)
-        
-        subject_name = data.get("subject", "")
-        division_name = data.get("division", "")
-        role = data.get("role", "")
-
-        students = Student.objects.all()
-
         try:
+            data = json.loads(request.body)
+            subject_name = data.get("subject", "")
+            division_name = data.get("division", "")
+            role = data.get("role", "")
+
+            students = Student.objects.all()
+
             if subject_name:
                 subject = Subject.objects.get(name=subject_name)
-                students.filter(subject=subject).distinct()
-                
+                students = students.filter(subject=subject)
+
             if division_name:
                 division = Division.objects.get(name=division_name)
-                students.filter(division=division).distinct()
+                students = students.filter(division=division)
 
-            response = {}
+            response = []
             for student in students:
-                {
-                    response.update({
-                        f"{student.uid}" : {
-                        "name" : {student.name},
-                        "email" : {student.email},
-                        "roll_no" : {student.roll_no},
-                        "division" : {student.division},
-                    }
-                })
+                student_info = {
+                    "uid": student.uid,
+                    "name": student.name,
+                    "email": student.email,
+                    "roll_no": student.roll_no,
                 }
+                response.append(student_info)
 
-                print(response)
-
-            return JsonResponse({"status": "success",})
-
-        except Subject.DoesNotExist:
-            return JsonResponse({"status": "error", "message": "Subject does not exist"}, status=400)
-        except Division.DoesNotExist:
-            return JsonResponse({"status": "error", "message": "Division does not exist"}, status=400)
+            return JsonResponse({"status": "success", "students": response})
+         
         except Exception as e:
             return JsonResponse({"status": "error", "message": str(e)}, status=500)
     
@@ -245,3 +236,46 @@ def get_timetable(request):
     else:
         return JsonResponse({"status" : "failed"})
 
+@csrf_exempt
+def mark_attendance_api(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        year = data.get('year')
+        day_name = data.get('day_name')
+        time_slot_start = data.get('time_slot_start')
+        time_slot_end = data.get('time_slot_end')
+        teacher_uid = data.get('teacher_uid')
+        subject_name = data.get('subject_name')
+        student_uids = data.get('uids')  # Assuming 'uids[]' is the name of the parameter containing student UIDs
+        
+        teacher = get_object_or_404(Teacher, uid=teacher_uid)
+        subject = get_object_or_404(Subject, name=subject_name)
+        day = get_object_or_404(Day, name=day_name)
+        time_slot = get_object_or_404(TimeSlot, start_time=time_slot_start, end_time=time_slot_end)
+        
+        try:
+            timetable = TimeTable.objects.get(year=year)
+            day_schedule = DaySchedule.objects.get(day=day, subject=subject, time_slot=time_slot)
+        except (TimeTable.DoesNotExist, DaySchedule.DoesNotExist):
+            return JsonResponse({'error': 'Day schedule not found for the given parameters.'}, status=404)
+        
+        students_present = Student.objects.filter(uid__in=student_uids)
+        
+        attendance, created = Attendance.objects.get_or_create(
+            day_schedule=day_schedule,
+            teacher=teacher,
+            date=date.today()
+        )
+        attendance.students_present.set(students_present)
+        attendance.save()
+        
+        present_students_names = [student.name for student in students_present]
+        response_data = {
+            'message': 'Attendance marked successfully.',
+            'subject': subject.name,
+            'students_present': present_students_names,
+            'time_slot' : time_slot.start_time
+        }
+        
+        return JsonResponse(response_data)
+    return JsonResponse({'error': 'Invalid request method.'}, status=400)
